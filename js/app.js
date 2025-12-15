@@ -38,6 +38,8 @@ class RaffleApp {
         document.getElementById('loadSampleNames').addEventListener('click', () => this.loadSampleNames());
         document.getElementById('clearNames').addEventListener('click', () => this.clearNames());
         document.getElementById('clearHistory').addEventListener('click', () => this.clearHistory());
+        document.getElementById('clearResults').addEventListener('click', () => this.clearResults());
+        document.getElementById('resetStats').addEventListener('click', () => this.resetStats());
         document.getElementById('exportResults').addEventListener('click', () => this.exportResults());
         document.getElementById('shareResults').addEventListener('click', () => this.shareResults());
         document.getElementById('closeModal').addEventListener('click', () => this.closeModal());
@@ -244,6 +246,9 @@ class RaffleApp {
         }
 
         this.stats.totalWinners += this.winners.length;
+        
+        // Show clear results button
+        document.getElementById('clearResults').style.display = 'inline-flex';
     }
 
     addWinnerToList(winner, position) {
@@ -276,6 +281,30 @@ class RaffleApp {
 
     closeModal() {
         document.getElementById('winnerModal').classList.remove('show');
+    }
+
+    clearResults() {
+        if (confirm('¿Estás seguro de que deseas limpiar los resultados actuales?')) {
+            // Clear winners array
+            this.winners = [];
+            
+            // Clear winners list display
+            const winnersList = document.getElementById('winnersList');
+            winnersList.innerHTML = '';
+            
+            // Reset drum content
+            const drumContent = document.getElementById('drumContent');
+            drumContent.innerHTML = '<i class="fas fa-ticket-alt"></i><p>Presiona "Iniciar Sorteo" para comenzar</p>';
+            
+            // Hide clear results button
+            document.getElementById('clearResults').style.display = 'none';
+            
+            // Disable export/share buttons
+            document.getElementById('exportResults').disabled = true;
+            document.getElementById('shareResults').disabled = true;
+            
+            this.showNotification('Resultados limpiados', 'info');
+        }
     }
 
     // ===== CONFETTI EFFECT =====
@@ -467,6 +496,47 @@ Generado por Generador de Rifas Profesional
         document.getElementById('totalParticipants').textContent = this.getParticipants().length;
         document.getElementById('totalWinners').textContent = this.stats.totalWinners;
         document.getElementById('totalRaffles').textContent = this.stats.totalRaffles;
+    }
+
+    resetStats() {
+        if (confirm('¿Estás seguro de que deseas resetear todas las estadísticas? Esta acción no se puede deshacer.')) {
+            // Reset stats
+            this.stats = {
+                totalParticipants: 0,
+                totalWinners: 0,
+                totalRaffles: 0
+            };
+            
+            // Clear history
+            this.history = [];
+            
+            // Clear current results
+            this.winners = [];
+            
+            // Update display
+            this.updateStats();
+            this.renderHistory();
+            
+            // Clear winners list
+            const winnersList = document.getElementById('winnersList');
+            winnersList.innerHTML = '';
+            
+            // Reset drum content
+            const drumContent = document.getElementById('drumContent');
+            drumContent.innerHTML = '<i class="fas fa-ticket-alt"></i><p>Presiona "Iniciar Sorteo" para comenzar</p>';
+            
+            // Hide clear results button
+            document.getElementById('clearResults').style.display = 'none';
+            
+            // Disable export/share buttons
+            document.getElementById('exportResults').disabled = true;
+            document.getElementById('shareResults').disabled = true;
+            
+            // Save changes
+            this.saveToLocalStorage();
+            
+            this.showNotification('Estadísticas reseteadas correctamente', 'success');
+        }
     }
 
     // ===== NOTIFICATIONS =====

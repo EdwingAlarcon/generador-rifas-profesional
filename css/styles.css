@@ -321,6 +321,17 @@ textarea {
     box-shadow: var(--shadow-lg);
 }
 
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    color: white;
+    box-shadow: var(--shadow-md);
+}
+
+.btn-danger:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
 .btn-large {
     width: 100%;
     padding: 16px;
@@ -544,6 +555,17 @@ textarea {
 
 .stat-card:hover {
     transform: translateY(-5px);
+}
+
+.stat-card-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 15px;
+}
+
+.stat-card-action .btn {
+    width: 100%;
 }
 
 .stat-card i {

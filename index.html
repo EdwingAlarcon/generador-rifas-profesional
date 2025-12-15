@@ -112,7 +112,12 @@
 
                 <!-- Ganadores -->
                 <div class="winners-section" id="winnersSection">
-                    <h3><i class="fas fa-star"></i> Ganadores</h3>
+                    <div class="section-header">
+                        <h3><i class="fas fa-star"></i> Ganadores</h3>
+                        <button class="btn btn-secondary btn-small" id="clearResults" style="display: none;">
+                            <i class="fas fa-broom"></i> Limpiar
+                        </button>
+                    </div>
                     <div class="winners-list" id="winnersList"></div>
                 </div>
 
@@ -163,6 +168,11 @@
                     <span class="stat-value" id="totalRaffles">0</span>
                     <span class="stat-label">Sorteos realizados</span>
                 </div>
+            </div>
+            <div class="stat-card stat-card-action">
+                <button class="btn btn-danger btn-large" id="resetStats">
+                    <i class="fas fa-undo"></i> Resetear Estadísticas
+                </button>
             </div>
         </div>
     </div>
