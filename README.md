@@ -136,12 +136,24 @@ Una aplicación web moderna, elegante e intuitiva para realizar sorteos con nomb
 
 ### Arquitectura
 ```
-generador-rifas/
+generador-rifas-profesional/
 │
-├── index.html          # Estructura HTML principal
-├── styles.css          # Estilos y animaciones
-├── app.js             # Lógica de la aplicación
-└── README.md          # Documentación
+├── index.html              # Estructura HTML principal
+├── README.md               # Documentación principal
+├── LICENSE                 # Licencia MIT
+├── .gitignore             # Configuración Git
+│
+├── css/
+│   └── styles.css         # Estilos y animaciones
+│
+├── js/
+│   └── app.js             # Lógica de la aplicación
+│
+├── docs/
+│   ├── INSTRUCCIONES_GITHUB.md  # Guía para GitHub
+│   └── RESUMEN_PROYECTO.md      # Resumen ejecutivo
+│
+└── assets/                # Recursos adicionales (imágenes, etc.)
 ```
 
 ### Clase Principal: RaffleApp
