@@ -14,6 +14,10 @@ class RaffleApp {
         };
         this.soundEnabled = true;
         this.theme = localStorage.getItem('theme') || 'light';
+        this.colorTheme = localStorage.getItem('colorTheme') || 'purple';
+        this.animationSpeed = localStorage.getItem('animationSpeed') || 'normal';
+        this.excludePreviousWinners = false;
+        this.previousWinnersToExclude = [];
         
         this.init();
     }
@@ -23,7 +27,34 @@ class RaffleApp {
         this.setupEventListeners();
         this.updateStats();
         this.applyTheme();
+        this.applyColorTheme();
         this.renderHistory();
+        this.registerServiceWorker();
+    }
+    
+    // ===== SERVICE WORKER =====
+    registerServiceWorker() {
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((registration) => {
+                        console.log('SW registrado:', registration.scope);
+                        
+                        // Verificar actualizaciones
+                        registration.addEventListener('updatefound', () => {
+                            const newWorker = registration.installing;
+                            newWorker.addEventListener('statechange', () => {
+                                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                    this.showNotification('Nueva versión disponible. Recarga para actualizar.', 'info');
+                                }
+                            });
+                        });
+                    })
+                    .catch((error) => {
+                        console.log('SW error:', error);
+                    });
+            });
+        }
     }
 
     // ===== EVENT LISTENERS =====
@@ -52,10 +83,247 @@ class RaffleApp {
             this.soundEnabled = e.target.checked;
         });
 
+        // Close modal with Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.closeModal();
+            }
+        });
+
+        // Close modal when clicking outside
+        document.getElementById('winnerModal').addEventListener('click', (e) => {
+            if (e.target.id === 'winnerModal') {
+                this.closeModal();
+            }
+        });
+
         // Real-time participant counting
         document.getElementById('nameInput').addEventListener('input', () => this.updateParticipantCount());
         document.getElementById('startNumber').addEventListener('input', () => this.updateParticipantCount());
         document.getElementById('endNumber').addEventListener('input', () => this.updateParticipantCount());
+        
+        // Update range counter initially
+        this.updateRangeCounter();
+        
+        // Import/Export CSV
+        const importBtn = document.getElementById('importCSV');
+        const exportListBtn = document.getElementById('exportListCSV');
+        const fileInput = document.getElementById('csvFileInput');
+        
+        if (importBtn) {
+            importBtn.addEventListener('click', () => fileInput?.click());
+        }
+        if (fileInput) {
+            fileInput.addEventListener('change', (e) => this.importFromCSV(e));
+        }
+        if (exportListBtn) {
+            exportListBtn.addEventListener('click', () => this.exportListToCSV());
+        }
+        
+        // Animation speed
+        const speedSelector = document.getElementById('animationSpeed');
+        if (speedSelector) {
+            speedSelector.value = this.animationSpeed;
+            speedSelector.addEventListener('change', (e) => {
+                this.animationSpeed = e.target.value;
+                this.saveToLocalStorage();
+            });
+        }
+        
+        // Color theme
+        const colorThemeSelector = document.getElementById('colorTheme');
+        if (colorThemeSelector) {
+            colorThemeSelector.value = this.colorTheme;
+            colorThemeSelector.addEventListener('change', (e) => {
+                this.colorTheme = e.target.value;
+                this.applyColorTheme();
+                this.saveToLocalStorage();
+            });
+        }
+        
+        // Exclude previous winners
+        const excludeCheckbox = document.getElementById('excludePreviousWinners');
+        if (excludeCheckbox) {
+            excludeCheckbox.addEventListener('change', (e) => {
+                this.excludePreviousWinners = e.target.checked;
+            });
+        }
+        
+        // Clear previous winners button
+        const clearExcludedBtn = document.getElementById('clearExcludedWinners');
+        if (clearExcludedBtn) {
+            clearExcludedBtn.addEventListener('click', () => this.clearPreviousWinners());
+        }
+        
+        // Update exclude counter on init
+        this.updateExcludeCounter();
+    }
+    
+    updateRangeCounter() {
+        const start = parseInt(document.getElementById('startNumber').value) || 0;
+        const end = parseInt(document.getElementById('endNumber').value) || 0;
+        const rangeCounter = document.getElementById('currentRangeCount');
+        if (rangeCounter) {
+            const count = Math.max(0, end - start + 1);
+            rangeCounter.textContent = count.toLocaleString();
+        }
+    }
+    
+    // ===== COLOR THEMES =====
+    applyColorTheme() {
+        const themes = {
+            purple: {
+                primary: '#6366f1',
+                primaryDark: '#4f46e5',
+                secondary: '#8b5cf6',
+                gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'
+            },
+            blue: {
+                primary: '#3b82f6',
+                primaryDark: '#2563eb',
+                secondary: '#60a5fa',
+                gradient: 'linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)'
+            },
+            green: {
+                primary: '#10b981',
+                primaryDark: '#059669',
+                secondary: '#34d399',
+                gradient: 'linear-gradient(135deg, #10b981 0%, #047857 100%)'
+            },
+            red: {
+                primary: '#ef4444',
+                primaryDark: '#dc2626',
+                secondary: '#f87171',
+                gradient: 'linear-gradient(135deg, #ef4444 0%, #b91c1c 100%)'
+            },
+            orange: {
+                primary: '#f59e0b',
+                primaryDark: '#d97706',
+                secondary: '#fbbf24',
+                gradient: 'linear-gradient(135deg, #f59e0b 0%, #b45309 100%)'
+            },
+            pink: {
+                primary: '#ec4899',
+                primaryDark: '#db2777',
+                secondary: '#f472b6',
+                gradient: 'linear-gradient(135deg, #ec4899 0%, #be185d 100%)'
+            },
+            teal: {
+                primary: '#14b8a6',
+                primaryDark: '#0d9488',
+                secondary: '#2dd4bf',
+                gradient: 'linear-gradient(135deg, #14b8a6 0%, #0f766e 100%)'
+            }
+        };
+        
+        const theme = themes[this.colorTheme] || themes.purple;
+        const root = document.documentElement;
+        
+        root.style.setProperty('--primary-color', theme.primary);
+        root.style.setProperty('--primary-dark', theme.primaryDark);
+        root.style.setProperty('--secondary-color', theme.secondary);
+        root.style.setProperty('--gradient-primary', theme.gradient);
+        
+        // Update meta theme-color
+        const metaTheme = document.querySelector('meta[name="theme-color"]');
+        if (metaTheme) {
+            metaTheme.content = theme.primary;
+        }
+    }
+    
+    // ===== IMPORT/EXPORT CSV =====
+    importFromCSV(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const content = e.target.result;
+                const lines = content.split(/\r?\n/);
+                const participants = [];
+                
+                lines.forEach(line => {
+                    // Split by comma, semicolon, or tab
+                    const cells = line.split(/[,;\t]/);
+                    cells.forEach(cell => {
+                        const trimmed = cell.trim().replace(/^["']|["']$/g, ''); // Remove quotes
+                        if (trimmed.length > 0) {
+                            participants.push(trimmed);
+                        }
+                    });
+                });
+                
+                if (participants.length > 0) {
+                    const nameInput = document.getElementById('nameInput');
+                    const currentValue = nameInput.value.trim();
+                    
+                    // Ask if append or replace
+                    if (currentValue.length > 0) {
+                        const append = confirm(`Ya hay participantes en la lista.\n\n¿Deseas agregar los ${participants.length} nuevos participantes a la lista existente?\n\nAceptar = Agregar\nCancelar = Reemplazar`);
+                        if (append) {
+                            nameInput.value = currentValue + '\n' + participants.join('\n');
+                        } else {
+                            nameInput.value = participants.join('\n');
+                        }
+                    } else {
+                        nameInput.value = participants.join('\n');
+                    }
+                    
+                    this.updateParticipantCount();
+                    this.showNotification(`${participants.length} participantes importados correctamente`, 'success');
+                } else {
+                    this.showNotification('No se encontraron participantes en el archivo', 'error');
+                }
+            } catch (error) {
+                this.showNotification('Error al leer el archivo CSV', 'error');
+                console.error('Error importing CSV:', error);
+            }
+        };
+        
+        reader.onerror = () => {
+            this.showNotification('Error al leer el archivo', 'error');
+        };
+        
+        reader.readAsText(file);
+        
+        // Reset file input
+        event.target.value = '';
+    }
+    
+    exportListToCSV() {
+        const participants = this.getParticipants();
+        
+        if (participants.length === 0) {
+            this.showNotification('No hay participantes para exportar', 'error');
+            return;
+        }
+        
+        // Create CSV content with header
+        const csvContent = 'Participante\n' + participants.map(p => `"${p}"`).join('\n');
+        
+        const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8' }); // BOM for Excel
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `participantes_${Date.now()}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        this.showNotification(`${participants.length} participantes exportados a CSV`, 'success');
+    }
+    
+    // ===== ANIMATION SPEED =====
+    getAnimationDuration() {
+        const speeds = {
+            fast: 1000,
+            normal: 2000,
+            slow: 3500,
+            instant: 100
+        };
+        return speeds[this.animationSpeed] || speeds.normal;
     }
 
     // ===== MODE SWITCHING =====
@@ -71,21 +339,30 @@ class RaffleApp {
         } else {
             namesSection.classList.add('hidden');
             numbersSection.classList.remove('hidden');
+            this.updateRangeCounter();
         }
         
         this.updateParticipantCount();
     }
 
     // ===== PARTICIPANT MANAGEMENT =====
+    
+    // Sanitize HTML to prevent XSS attacks
+    sanitizeHTML(str) {
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
     getParticipants() {
         if (this.mode === 'names') {
             const input = document.getElementById('nameInput').value.trim();
             if (!input) return [];
             
-            // Split by lines or commas, clean up
+            // Split by lines or commas, clean up and sanitize
             const participants = input
                 .split(/[\n,]+/)
-                .map(name => name.trim())
+                .map(name => this.sanitizeHTML(name.trim()))
                 .filter(name => name.length > 0);
             
             return participants;
@@ -94,6 +371,13 @@ class RaffleApp {
             const end = parseInt(document.getElementById('endNumber').value);
             
             if (isNaN(start) || isNaN(end) || start > end) return [];
+            
+            // Limit range to prevent browser freeze (max 100,000 numbers)
+            const maxRange = 100000;
+            if ((end - start + 1) > maxRange) {
+                this.showNotification(`El rango máximo permitido es ${maxRange.toLocaleString()} números`, 'error');
+                return [];
+            }
             
             const numbers = [];
             for (let i = start; i <= end; i++) {
@@ -105,7 +389,29 @@ class RaffleApp {
 
     updateParticipantCount() {
         const participants = this.getParticipants();
-        document.getElementById('totalParticipants').textContent = participants.length;
+        const count = participants.length;
+        
+        // Update stats panel
+        document.getElementById('totalParticipants').textContent = count;
+        
+        // Update inline counter based on mode
+        if (this.mode === 'names') {
+            const nameCounter = document.getElementById('currentParticipantCount');
+            if (nameCounter) {
+                nameCounter.textContent = count;
+            }
+        } else {
+            const rangeCounter = document.getElementById('currentRangeCount');
+            if (rangeCounter) {
+                rangeCounter.textContent = count;
+            }
+        }
+        
+        // Update max winners validation hint
+        const winnerInput = document.getElementById('winnerCount');
+        if (winnerInput && !document.getElementById('allowRepeat').checked) {
+            winnerInput.max = Math.min(count, 50);
+        }
     }
 
     loadSampleNames() {
@@ -137,6 +443,25 @@ class RaffleApp {
         this.updateParticipantCount();
         this.showNotification('Lista limpiada', 'info');
     }
+    
+    // Check for duplicate participants and return info
+    checkDuplicates(participants) {
+        const seen = new Map();
+        const duplicates = [];
+        
+        participants.forEach((name, index) => {
+            const normalizedName = name.toLowerCase().trim();
+            if (seen.has(normalizedName)) {
+                if (!duplicates.includes(name)) {
+                    duplicates.push(name);
+                }
+            } else {
+                seen.set(normalizedName, index);
+            }
+        });
+        
+        return duplicates;
+    }
 
     // ===== RAFFLE LOGIC =====
     async startRaffle() {
@@ -146,18 +471,38 @@ class RaffleApp {
 
         // Validations
         if (participants.length === 0) {
-            this.showNotification('Por favor, ingresa participantes', 'error');
+            if (this.mode === 'names') {
+                this.showNotification('Por favor, ingresa participantes', 'error');
+            } else {
+                this.showNotification('Por favor, define un rango de números válido (desde debe ser menor o igual a hasta)', 'error');
+            }
             return;
         }
 
-        if (winnerCount < 1) {
+        if (winnerCount < 1 || isNaN(winnerCount)) {
             this.showNotification('Debe haber al menos 1 ganador', 'error');
             return;
         }
 
-        if (!allowRepeat && winnerCount > participants.length) {
-            this.showNotification('No hay suficientes participantes únicos', 'error');
+        // Limit winners to prevent performance issues
+        const maxWinners = 50;
+        if (winnerCount > maxWinners) {
+            this.showNotification(`El máximo de ganadores permitido es ${maxWinners}`, 'error');
             return;
+        }
+
+        if (!allowRepeat && winnerCount > participants.length) {
+            this.showNotification(`No hay suficientes participantes (${participants.length}) para ${winnerCount} ganadores únicos`, 'error');
+            return;
+        }
+        
+        // Warn about duplicates in names mode (only if not allowing repeats)
+        if (this.mode === 'names' && !allowRepeat) {
+            const duplicates = this.checkDuplicates(participants);
+            if (duplicates.length > 0) {
+                const proceed = confirm(`Se detectaron nombres duplicados: ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? '...' : ''}\n\n¿Deseas continuar de todas formas? Los duplicados tendrán más probabilidad de ganar.`);
+                if (!proceed) return;
+            }
         }
 
         // Clear previous winners
@@ -190,20 +535,42 @@ class RaffleApp {
     async animateRaffle(participants, winnerCount, allowRepeat) {
         const drumContent = document.getElementById('drumContent');
         let availableParticipants = [...participants];
+        
+        // Exclude previous winners if option is enabled
+        if (this.excludePreviousWinners && this.previousWinnersToExclude.length > 0) {
+            const excludeSet = new Set(this.previousWinnersToExclude.map(w => w.toLowerCase()));
+            const originalCount = availableParticipants.length;
+            availableParticipants = availableParticipants.filter(p => !excludeSet.has(p.toLowerCase()));
+            
+            const excluded = originalCount - availableParticipants.length;
+            if (excluded > 0) {
+                this.showNotification(`${excluded} ganadores anteriores excluidos del sorteo`, 'info');
+            }
+            
+            if (availableParticipants.length === 0) {
+                this.showNotification('No quedan participantes después de excluir ganadores anteriores', 'error');
+                return;
+            }
+            
+            if (!allowRepeat && winnerCount > availableParticipants.length) {
+                this.showNotification(`No hay suficientes participantes (${availableParticipants.length}) después de excluir ganadores`, 'error');
+                return;
+            }
+        }
 
         for (let i = 0; i < winnerCount; i++) {
             // Spinning animation
-            drumContent.innerHTML = '<i class="fas fa-spinner"></i><p>Sorteando...</p>';
+            drumContent.innerHTML = '<i class="fas fa-spinner" aria-hidden="true"></i><p>Sorteando...</p>';
             drumContent.classList.add('spinning');
             
             if (this.soundEnabled) {
                 this.playSound('spin');
             }
 
-            // Random animation
-            const animationDuration = 2000;
+            // Random animation with configurable speed
+            const animationDuration = this.getAnimationDuration();
             const intervalSpeed = 50;
-            const iterations = animationDuration / intervalSpeed;
+            const iterations = Math.max(2, animationDuration / intervalSpeed);
             
             for (let j = 0; j < iterations; j++) {
                 const randomIndex = Math.floor(Math.random() * availableParticipants.length);
@@ -232,6 +599,7 @@ class RaffleApp {
 
             // Add to winners list
             this.winners.push(winner);
+            this.previousWinnersToExclude.push(winner); // Track for future exclusion
             this.addWinnerToList(winner, i + 1);
 
             // Show modal for first winner
@@ -239,9 +607,10 @@ class RaffleApp {
                 this.showWinnerModal(winner);
             }
 
-            // Wait before next winner
+            // Wait before next winner (scaled with animation speed)
             if (i < winnerCount - 1) {
-                await this.sleep(1500);
+                const waitTime = this.animationSpeed === 'instant' ? 300 : 1500;
+                await this.sleep(waitTime);
             }
         }
 
@@ -607,8 +976,11 @@ Generado por Generador de Rifas Profesional
     saveToLocalStorage() {
         const data = {
             theme: this.theme,
+            colorTheme: this.colorTheme,
+            animationSpeed: this.animationSpeed,
             history: this.history,
-            stats: this.stats
+            stats: this.stats,
+            previousWinnersToExclude: this.previousWinnersToExclude
         };
         localStorage.setItem('raffleApp', JSON.stringify(data));
     }
@@ -618,8 +990,28 @@ Generado por Generador de Rifas Profesional
         if (data) {
             const parsed = JSON.parse(data);
             this.theme = parsed.theme || 'light';
+            this.colorTheme = parsed.colorTheme || 'purple';
+            this.animationSpeed = parsed.animationSpeed || 'normal';
             this.history = parsed.history || [];
             this.stats = parsed.stats || { totalParticipants: 0, totalWinners: 0, totalRaffles: 0 };
+            this.previousWinnersToExclude = parsed.previousWinnersToExclude || [];
+        }
+    }
+    
+    // Clear previous winners for exclusion
+    clearPreviousWinners() {
+        if (confirm('¿Estás seguro de que deseas limpiar la lista de ganadores anteriores? Esto permitirá que vuelvan a participar en sorteos futuros.')) {
+            this.previousWinnersToExclude = [];
+            this.saveToLocalStorage();
+            this.showNotification('Lista de ganadores anteriores limpiada', 'success');
+            this.updateExcludeCounter();
+        }
+    }
+    
+    updateExcludeCounter() {
+        const counter = document.getElementById('excludedWinnersCount');
+        if (counter) {
+            counter.textContent = this.previousWinnersToExclude.length;
         }
     }
 
@@ -656,12 +1048,3 @@ document.head.appendChild(style);
 document.addEventListener('DOMContentLoaded', () => {
     window.raffleApp = new RaffleApp();
 });
-
-// Service Worker for PWA (optional enhancement)
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {
-            // Service worker not available, no problem
-        });
-    });
-}

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="100" fill="url(#grad)"/>
+  <g fill="white" transform="translate(256,256)">
+    <!-- Ticket icon -->
+    <path d="M-120,-80 L120,-80 C135,-80 145,-70 145,-55 L145,-20 C125,-20 110,-5 110,15 C110,35 125,50 145,50 L145,85 C145,100 135,110 120,110 L-120,110 C-135,110 -145,100 -145,85 L-145,50 C-125,50 -110,35 -110,15 C-110,-5 -125,-20 -145,-20 L-145,-55 C-145,-70 -135,-80 -120,-80 Z" transform="rotate(-30)"/>
+    <!-- Star -->
+    <path d="M0,-45 L12,-15 L45,-15 L18,5 L28,40 L0,20 L-28,40 L-18,5 L-45,-15 L-12,-15 Z" fill="#fbbf24" transform="translate(0,-10) scale(0.8)"/>
+  </g>
+</svg>

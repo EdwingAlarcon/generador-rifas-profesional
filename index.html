@@ -3,56 +3,94 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Generador de rifas profesional para sorteos con nombres o números. Ideal para rifas, concursos y eventos.">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Rifas Pro">
+    <link rel="manifest" href="manifest.json">
+    <link rel="icon" type="image/svg+xml" href="icons/icon.svg">
+    <link rel="apple-touch-icon" href="icons/icon.svg">
     <title>Generador de Rifas Profesional</title>
     <link rel="stylesheet" href="css/styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body>
-    <div class="theme-toggle" id="themeToggle">
-        <i class="fas fa-moon"></i>
+    <!-- Controles de tema -->
+    <div class="theme-controls">
+        <button class="theme-toggle" id="themeToggle" aria-label="Cambiar tema claro/oscuro" title="Cambiar tema">
+            <i class="fas fa-moon" aria-hidden="true"></i>
+        </button>
+        <div class="color-theme-selector">
+            <label for="colorTheme" class="visually-hidden">Seleccionar color del tema</label>
+            <select id="colorTheme" class="color-select" title="Color del tema">
+                <option value="purple">💜 Morado</option>
+                <option value="blue">💙 Azul</option>
+                <option value="green">💚 Verde</option>
+                <option value="red">❤️ Rojo</option>
+                <option value="orange">🧡 Naranja</option>
+                <option value="pink">💗 Rosa</option>
+                <option value="teal">🩵 Turquesa</option>
+            </select>
+        </div>
     </div>
 
     <div class="container">
-        <header class="header">
-            <h1><i class="fas fa-ticket-alt"></i> Generador de Rifas Profesional</h1>
+        <header class="header" role="banner">
+            <h1><i class="fas fa-ticket-alt" aria-hidden="true"></i> Generador de Rifas Profesional</h1>
             <p class="subtitle">Sistema avanzado para sorteos con nombres o números</p>
         </header>
 
         <div class="main-content">
             <!-- Panel de configuración -->
-            <div class="config-panel">
-                <h2><i class="fas fa-cog"></i> Configuración</h2>
+            <section class="config-panel" aria-labelledby="config-title">
+                <h2 id="config-title"><i class="fas fa-cog" aria-hidden="true"></i> Configuración</h2>
                 
-                <div class="mode-selector">
+                <fieldset class="mode-selector">
+                    <legend class="visually-hidden">Seleccionar modo de sorteo</legend>
                     <label class="radio-label">
-                        <input type="radio" name="mode" value="names" checked>
+                        <input type="radio" name="mode" value="names" checked aria-describedby="mode-desc">
                         <span class="radio-custom">
-                            <i class="fas fa-user"></i> Nombres
+                            <i class="fas fa-user" aria-hidden="true"></i> Nombres
                         </span>
                     </label>
                     <label class="radio-label">
-                        <input type="radio" name="mode" value="numbers">
+                        <input type="radio" name="mode" value="numbers" aria-describedby="mode-desc">
                         <span class="radio-custom">
-                            <i class="fas fa-hashtag"></i> Números
+                            <i class="fas fa-hashtag" aria-hidden="true"></i> Números
                         </span>
                     </label>
-                </div>
+                </fieldset>
+                <span id="mode-desc" class="visually-hidden">Elige entre sortear nombres de participantes o números de un rango</span>
 
                 <!-- Modo Nombres -->
                 <div class="input-section" id="namesSection">
-                    <label for="nameInput"><i class="fas fa-users"></i> Participantes</label>
+                    <label for="nameInput"><i class="fas fa-users" aria-hidden="true"></i> Participantes</label>
                     <textarea 
                         id="nameInput" 
                         placeholder="Ingresa los nombres separados por líneas o comas:&#10;Juan Pérez&#10;María García&#10;Pedro López"
                         rows="8"
+                        aria-describedby="participantCount"
                     ></textarea>
+                    <div class="participant-counter" id="participantCount" aria-live="polite">
+                        <i class="fas fa-users" aria-hidden="true"></i> <span id="currentParticipantCount">0</span> participantes ingresados
+                    </div>
                     <div class="button-group">
-                        <button class="btn btn-secondary" id="loadSampleNames">
-                            <i class="fas fa-file-import"></i> Cargar ejemplo
+                        <button class="btn btn-secondary" id="loadSampleNames" type="button">
+                            <i class="fas fa-file-import" aria-hidden="true"></i> Cargar ejemplo
                         </button>
-                        <button class="btn btn-secondary" id="clearNames">
-                            <i class="fas fa-trash"></i> Limpiar
+                        <button class="btn btn-secondary" id="clearNames" type="button">
+                            <i class="fas fa-trash" aria-hidden="true"></i> Limpiar
                         </button>
+                    </div>
+                    <div class="button-group" style="margin-top: 10px;">
+                        <button class="btn btn-secondary" id="importCSV" type="button" title="Importar participantes desde archivo CSV">
+                            <i class="fas fa-file-csv" aria-hidden="true"></i> Importar CSV
+                        </button>
+                        <button class="btn btn-secondary" id="exportListCSV" type="button" title="Exportar lista de participantes a CSV">
+                            <i class="fas fa-file-export" aria-hidden="true"></i> Exportar CSV
+                        </button>
+                        <input type="file" id="csvFileInput" accept=".csv,.txt" class="hidden" aria-hidden="true">
                     </div>
                 </div>
 
@@ -61,12 +99,15 @@
                     <div class="number-range">
                         <div class="form-group">
                             <label for="startNumber">Desde</label>
-                            <input type="number" id="startNumber" value="1" min="0">
+                            <input type="number" id="startNumber" value="1" min="0" aria-describedby="rangeHelp">
                         </div>
                         <div class="form-group">
                             <label for="endNumber">Hasta</label>
-                            <input type="number" id="endNumber" value="100" min="1">
+                            <input type="number" id="endNumber" value="100" min="1" aria-describedby="rangeHelp">
                         </div>
+                    </div>
+                    <div class="participant-counter" id="rangeHelp" aria-live="polite">
+                        <i class="fas fa-hashtag" aria-hidden="true"></i> <span id="currentRangeCount">100</span> números en el rango
                     </div>
                 </div>
 
@@ -74,9 +115,22 @@
                 <div class="raffle-options">
                     <div class="form-group">
                         <label for="winnerCount">
-                            <i class="fas fa-trophy"></i> Cantidad de ganadores
+                            <i class="fas fa-trophy" aria-hidden="true"></i> Cantidad de ganadores
                         </label>
-                        <input type="number" id="winnerCount" value="1" min="1">
+                        <input type="number" id="winnerCount" value="1" min="1" max="50" aria-describedby="winnerHelp">
+                        <small id="winnerHelp" class="help-text">Máximo 50 ganadores por sorteo</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="animationSpeed">
+                            <i class="fas fa-tachometer-alt" aria-hidden="true"></i> Velocidad de animación
+                        </label>
+                        <select id="animationSpeed" class="form-select">
+                            <option value="instant">Instantáneo</option>
+                            <option value="fast">Rápido</option>
+                            <option value="normal" selected>Normal</option>
+                            <option value="slow">Lento (más suspenso)</option>
+                        </select>
                     </div>
                     
                     <div class="checkbox-group">
@@ -88,13 +142,22 @@
                             <input type="checkbox" id="soundEnabled" checked>
                             <span>Sonidos activados</span>
                         </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="excludePreviousWinners">
+                            <span>Excluir ganadores anteriores (<span id="excludedWinnersCount">0</span>)</span>
+                        </label>
                     </div>
+                    
+                    <button class="btn btn-secondary btn-small" id="clearExcludedWinners" type="button" style="margin-top: 10px;">
+                        <i class="fas fa-user-times" aria-hidden="true"></i> Limpiar lista de excluidos
+                    </button>
                 </div>
 
-                <button class="btn btn-primary btn-large" id="startRaffle">
-                    <i class="fas fa-dice"></i> Iniciar Sorteo
+                <button class="btn btn-primary btn-large" id="startRaffle" type="button" aria-describedby="raffleStatus">
+                    <i class="fas fa-dice" aria-hidden="true"></i> Iniciar Sorteo
                 </button>
-            </div>
+                <span id="raffleStatus" class="visually-hidden" aria-live="assertive"></span>
+            </section>
 
             <!-- Panel de resultados -->
             <div class="results-panel">
@@ -178,13 +241,13 @@
     </div>
 
     <!-- Modal de ganador -->
-    <div class="modal" id="winnerModal">
+    <div class="modal" id="winnerModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
         <div class="modal-content">
-            <div class="confetti"></div>
-            <i class="fas fa-trophy modal-icon"></i>
-            <h2>¡Felicidades!</h2>
-            <div class="winner-display" id="winnerDisplay"></div>
-            <button class="btn btn-primary" id="closeModal">Aceptar</button>
+            <div class="confetti" aria-hidden="true"></div>
+            <i class="fas fa-trophy modal-icon" aria-hidden="true"></i>
+            <h2 id="modalTitle">¡Felicidades!</h2>
+            <div class="winner-display" id="winnerDisplay" aria-live="polite"></div>
+            <button class="btn btn-primary" id="closeModal" type="button">Aceptar</button>
         </div>
     </div>
 
