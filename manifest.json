@@ -2,12 +2,19 @@
   "name": "Generador de Rifas Profesional",
   "short_name": "Rifas Pro",
   "description": "Sistema avanzado para sorteos con nombres o números. Ideal para rifas, concursos y eventos.",
-  "start_url": "/index.html",
+  "id": "./index.html",
+  "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#f9fafb",
   "theme_color": "#6366f1",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable any"
+    },
     {
       "src": "icons/icon-72x72.png",
       "sizes": "72x72",

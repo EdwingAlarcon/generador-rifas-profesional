@@ -2,6 +2,7 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com; script-src 'self'; worker-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://cdnjs.cloudflare.com; frame-ancestors 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Generador de rifas profesional para sorteos con nombres o números. Ideal para rifas, concursos y eventos.">
     <meta name="theme-color" content="#6366f1">
@@ -13,7 +14,7 @@
     <link rel="apple-touch-icon" href="icons/icon.svg">
     <title>Generador de Rifas Profesional</title>
     <link rel="stylesheet" href="css/styles.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer">
 </head>
 <body>
     <!-- Controles de tema -->
@@ -35,7 +36,7 @@
         </div>
     </div>
 
-    <div class="container">
+    <main class="container">
         <header class="header" role="banner">
             <h1><i class="fas fa-ticket-alt" aria-hidden="true"></i> Generador de Rifas Profesional</h1>
             <p class="subtitle">Sistema avanzado para sorteos con nombres o números</p>
@@ -238,6 +239,17 @@
                 </button>
             </div>
         </div>
+    </main>
+
+    <!-- Modal de confirmación -->
+    <div class="modal" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmMessage">
+        <div class="modal-content modal-content--confirm">
+            <p id="confirmMessage" class="confirm-message"></p>
+            <div class="confirm-actions">
+                <button class="btn btn-primary" id="confirmOk" type="button">Aceptar</button>
+                <button class="btn btn-secondary" id="confirmCancel" type="button">Cancelar</button>
+            </div>
+        </div>
     </div>
 
     <!-- Modal de ganador -->
@@ -251,7 +263,7 @@
         </div>
     </div>
 
-    <footer class="footer">
+    <footer class="footer" role="contentinfo">
         <p>Generador de Rifas Profesional v1.0 | Desarrollado con <i class="fas fa-heart"></i></p>
     </footer>
 

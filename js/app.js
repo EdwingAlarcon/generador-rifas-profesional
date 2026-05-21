@@ -1,6 +1,15 @@
 // ===== APLICACIÓN DE RIFAS - JAVASCRIPT =====
 // Desarrollado con las mejores prácticas y arquitectura modular
 
+const CONFIG = Object.freeze({
+    MAX_WINNERS: 50,
+    MAX_NUMBER_RANGE: 100_000,
+    MAX_HISTORY_ITEMS: 10,
+    NOTIFICATION_TIMEOUT_MS: 3000,
+    WINNER_PAUSE_MS: 1500,
+    WINNER_PAUSE_INSTANT_MS: 300,
+});
+
 class RaffleApp {
     constructor() {
         this.mode = 'names';
@@ -13,11 +22,13 @@ class RaffleApp {
             totalRaffles: 0
         };
         this.soundEnabled = true;
-        this.theme = localStorage.getItem('theme') || 'light';
-        this.colorTheme = localStorage.getItem('colorTheme') || 'purple';
-        this.animationSpeed = localStorage.getItem('animationSpeed') || 'normal';
+        this.theme = 'light';
+        this.colorTheme = 'purple';
+        this.animationSpeed = 'normal';
         this.excludePreviousWinners = false;
         this.previousWinnersToExclude = [];
+        this.audioContext = null;
+        this._previouslyFocused = null;
         
         this.init();
     }
@@ -45,7 +56,7 @@ class RaffleApp {
                             const newWorker = registration.installing;
                             newWorker.addEventListener('statechange', () => {
                                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                                    this.showNotification('Nueva versión disponible. Recarga para actualizar.', 'info');
+                                    this.showUpdateBanner(registration);
                                 }
                             });
                         });
@@ -55,6 +66,21 @@ class RaffleApp {
                     });
             });
         }
+    }
+
+    showUpdateBanner(registration) {
+        const banner = document.createElement('div');
+        banner.className = 'pwa-install-banner';
+        banner.setAttribute('role', 'alert');
+        banner.innerHTML = `
+            <span><i class="fas fa-sync-alt" aria-hidden="true"></i> Nueva versión disponible.</span>
+            <button type="button" id="updateNowBtn">Actualizar</button>
+        `;
+        document.body.appendChild(banner);
+        banner.querySelector('#updateNowBtn').addEventListener('click', () => {
+            registration.waiting?.postMessage({ type: 'SKIP_WAITING' });
+            window.location.reload();
+        });
     }
 
     // ===== EVENT LISTENERS =====
@@ -97,10 +123,11 @@ class RaffleApp {
             }
         });
 
-        // Real-time participant counting
-        document.getElementById('nameInput').addEventListener('input', () => this.updateParticipantCount());
-        document.getElementById('startNumber').addEventListener('input', () => this.updateParticipantCount());
-        document.getElementById('endNumber').addEventListener('input', () => this.updateParticipantCount());
+        // Real-time participant counting (debounced for performance)
+        const debouncedCount = this.debounce(() => this.updateParticipantCount(), 150);
+        document.getElementById('nameInput').addEventListener('input', debouncedCount);
+        document.getElementById('startNumber').addEventListener('input', debouncedCount);
+        document.getElementById('endNumber').addEventListener('input', debouncedCount);
         
         // Update range counter initially
         this.updateRangeCounter();
@@ -237,7 +264,7 @@ class RaffleApp {
         if (!file) return;
         
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const content = e.target.result;
                 const lines = content.split(/\r?\n/);
@@ -258,9 +285,11 @@ class RaffleApp {
                     const nameInput = document.getElementById('nameInput');
                     const currentValue = nameInput.value.trim();
                     
-                    // Ask if append or replace
                     if (currentValue.length > 0) {
-                        const append = confirm(`Ya hay participantes en la lista.\n\n¿Deseas agregar los ${participants.length} nuevos participantes a la lista existente?\n\nAceptar = Agregar\nCancelar = Reemplazar`);
+                        const append = await this.showConfirm(
+                            `Ya hay participantes en la lista.\n\n¿Deseas agregar los ${participants.length} nuevos participantes a la lista existente?`,
+                            'Agregar', 'Reemplazar'
+                        );
                         if (append) {
                             nameInput.value = currentValue + '\n' + participants.join('\n');
                         } else {
@@ -372,10 +401,9 @@ class RaffleApp {
             
             if (isNaN(start) || isNaN(end) || start > end) return [];
             
-            // Limit range to prevent browser freeze (max 100,000 numbers)
-            const maxRange = 100000;
-            if ((end - start + 1) > maxRange) {
-                this.showNotification(`El rango máximo permitido es ${maxRange.toLocaleString()} números`, 'error');
+            // Limit range to prevent browser freeze
+            if ((end - start + 1) > CONFIG.MAX_NUMBER_RANGE) {
+                this.showNotification(`El rango máximo permitido es ${CONFIG.MAX_NUMBER_RANGE.toLocaleString()} números`, 'error');
                 return [];
             }
             
@@ -388,8 +416,7 @@ class RaffleApp {
     }
 
     updateParticipantCount() {
-        const participants = this.getParticipants();
-        const count = participants.length;
+        const count = this.getParticipantCount();
         
         // Update stats panel
         document.getElementById('totalParticipants').textContent = count;
@@ -403,14 +430,14 @@ class RaffleApp {
         } else {
             const rangeCounter = document.getElementById('currentRangeCount');
             if (rangeCounter) {
-                rangeCounter.textContent = count;
+                rangeCounter.textContent = count.toLocaleString();
             }
         }
         
         // Update max winners validation hint
         const winnerInput = document.getElementById('winnerCount');
         if (winnerInput && !document.getElementById('allowRepeat').checked) {
-            winnerInput.max = Math.min(count, 50);
+            winnerInput.max = Math.min(count, CONFIG.MAX_WINNERS);
         }
     }
 
@@ -485,9 +512,8 @@ class RaffleApp {
         }
 
         // Limit winners to prevent performance issues
-        const maxWinners = 50;
-        if (winnerCount > maxWinners) {
-            this.showNotification(`El máximo de ganadores permitido es ${maxWinners}`, 'error');
+        if (winnerCount > CONFIG.MAX_WINNERS) {
+            this.showNotification(`El máximo de ganadores permitido es ${CONFIG.MAX_WINNERS}`, 'error');
             return;
         }
 
@@ -500,7 +526,9 @@ class RaffleApp {
         if (this.mode === 'names' && !allowRepeat) {
             const duplicates = this.checkDuplicates(participants);
             if (duplicates.length > 0) {
-                const proceed = confirm(`Se detectaron nombres duplicados: ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? '...' : ''}\n\n¿Deseas continuar de todas formas? Los duplicados tendrán más probabilidad de ganar.`);
+                const proceed = await this.showConfirm(
+                    `Se detectaron nombres duplicados: ${duplicates.slice(0, 3).join(', ')}${duplicates.length > 3 ? '...' : ''}\n\n¿Deseas continuar de todas formas? Los duplicados tendrán más probabilidad de ganar.`
+                );
                 if (!proceed) return;
             }
         }
@@ -513,11 +541,20 @@ class RaffleApp {
         const raffleButton = document.getElementById('startRaffle');
         raffleButton.disabled = true;
 
+        // Announce start to screen readers
+        const statusEl = document.getElementById('raffleStatus');
+        if (statusEl) statusEl.textContent = 'Sorteo en progreso…';
+
         // Animate raffle
         await this.animateRaffle(participants, winnerCount, allowRepeat);
 
         // Re-enable button
         raffleButton.disabled = false;
+
+        // Announce result to screen readers
+        if (statusEl) {
+            statusEl.textContent = `Sorteo finalizado. Ganadores: ${this.winners.join(', ')}.`;
+        }
 
         // Save to history
         this.saveToHistory();
@@ -578,8 +615,8 @@ class RaffleApp {
                 await this.sleep(intervalSpeed);
             }
 
-            // Select winner
-            const winnerIndex = Math.floor(Math.random() * availableParticipants.length);
+            // Select winner using cryptographically secure RNG
+            const winnerIndex = this.getSecureRandom(availableParticipants.length);
             const winner = availableParticipants[winnerIndex];
 
             // Remove from available if not allowing repeats
@@ -609,7 +646,7 @@ class RaffleApp {
 
             // Wait before next winner (scaled with animation speed)
             if (i < winnerCount - 1) {
-                const waitTime = this.animationSpeed === 'instant' ? 300 : 1500;
+                const waitTime = this.animationSpeed === 'instant' ? CONFIG.WINNER_PAUSE_INSTANT_MS : CONFIG.WINNER_PAUSE_MS;
                 await this.sleep(waitTime);
             }
         }
@@ -645,15 +682,46 @@ class RaffleApp {
         winnerDisplay.textContent = winner;
         modal.classList.add('show');
         
+        // Save focused element and trap focus inside modal
+        this._previouslyFocused = document.activeElement;
+        const closeBtn = document.getElementById('closeModal');
+        closeBtn.focus();
+        
+        modal.addEventListener('keydown', this._trapFocus);
+        
         this.createConfetti();
     }
 
+    _trapFocus = (e) => {
+        if (e.key !== 'Tab') return;
+        const modal = document.getElementById('winnerModal');
+        const focusable = Array.from(modal.querySelectorAll(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )).filter(el => !el.disabled);
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey) {
+            if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+            if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+    };
+
     closeModal() {
-        document.getElementById('winnerModal').classList.remove('show');
+        const modal = document.getElementById('winnerModal');
+        modal.classList.remove('show');
+        modal.removeEventListener('keydown', this._trapFocus);
+        // Return focus to the element that triggered the modal
+        if (this._previouslyFocused) {
+            this._previouslyFocused.focus();
+            this._previouslyFocused = null;
+        }
     }
 
-    clearResults() {
-        if (confirm('¿Estás seguro de que deseas limpiar los resultados actuales?')) {
+    async clearResults() {
+        const confirmed = await this.showConfirm('¿Estás seguro de que deseas limpiar los resultados actuales?');
+        if (confirmed) {
             // Clear winners array
             this.winners = [];
             
@@ -711,9 +779,9 @@ class RaffleApp {
         
         this.history.unshift(historyItem);
         
-        // Keep only last 10 items
-        if (this.history.length > 10) {
-            this.history = this.history.slice(0, 10);
+        // Keep only last N items
+        if (this.history.length > CONFIG.MAX_HISTORY_ITEMS) {
+            this.history = this.history.slice(0, CONFIG.MAX_HISTORY_ITEMS);
         }
         
         this.renderHistory();
@@ -747,8 +815,9 @@ class RaffleApp {
         });
     }
 
-    clearHistory() {
-        if (confirm('¿Estás seguro de que deseas limpiar el historial?')) {
+    async clearHistory() {
+        const confirmed = await this.showConfirm('¿Estás seguro de que deseas limpiar el historial?');
+        if (confirmed) {
             this.history = [];
             this.renderHistory();
             this.saveToLocalStorage();
@@ -827,18 +896,11 @@ Generado por Generador de Rifas Profesional
 
     copyToClipboard(text) {
         if (navigator.clipboard) {
-            navigator.clipboard.writeText(text).then(() => {
-                this.showNotification('Resultados copiados al portapapeles', 'success');
-            });
+            navigator.clipboard.writeText(text)
+                .then(() => this.showNotification('Resultados copiados al portapapeles', 'success'))
+                .catch(() => this.showNotification('No se pudo copiar al portapapeles', 'error'));
         } else {
-            // Fallback
-            const textarea = document.createElement('textarea');
-            textarea.value = text;
-            document.body.appendChild(textarea);
-            textarea.select();
-            document.execCommand('copy');
-            document.body.removeChild(textarea);
-            this.showNotification('Resultados copiados al portapapeles', 'success');
+            this.showNotification('Tu navegador no soporta el portapapeles automático', 'error');
         }
     }
 
@@ -862,13 +924,14 @@ Generado por Generador de Rifas Profesional
 
     // ===== STATS =====
     updateStats() {
-        document.getElementById('totalParticipants').textContent = this.getParticipants().length;
+        document.getElementById('totalParticipants').textContent = this.getParticipantCount();
         document.getElementById('totalWinners').textContent = this.stats.totalWinners;
         document.getElementById('totalRaffles').textContent = this.stats.totalRaffles;
     }
 
-    resetStats() {
-        if (confirm('¿Estás seguro de que deseas resetear todas las estadísticas? Esta acción no se puede deshacer.')) {
+    async resetStats() {
+        const confirmed = await this.showConfirm('¿Estás seguro de que deseas resetear todas las estadísticas? Esta acción no se puede deshacer.');
+        if (confirmed) {
             // Reset stats
             this.stats = {
                 totalParticipants: 0,
@@ -910,39 +973,28 @@ Generado por Generador de Rifas Profesional
 
     // ===== NOTIFICATIONS =====
     showNotification(message, type = 'info') {
-        // Create notification element
         const notification = document.createElement('div');
-        notification.style.cssText = `
-            position: fixed;
-            top: 100px;
-            right: 20px;
-            padding: 15px 25px;
-            background: ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6'};
-            color: white;
-            border-radius: 8px;
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-            z-index: 3000;
-            animation: slideInRight 0.3s ease;
-            font-weight: 600;
-        `;
-        
-        notification.innerHTML = `
-            <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-            ${message}
-        `;
+        notification.className = `notification notification--${type}`;
+        const icons = { success: 'check-circle', error: 'exclamation-circle', info: 'info-circle', warning: 'exclamation-triangle' };
+        notification.innerHTML = `<i class="fas fa-${icons[type] || icons.info}" aria-hidden="true"></i><span>${message}</span>`;
+        notification.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        notification.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
         
         document.body.appendChild(notification);
         
         setTimeout(() => {
-            notification.style.animation = 'fadeOut 0.3s ease';
+            notification.style.animation = 'fadeOut 0.3s ease forwards';
             setTimeout(() => notification.remove(), 300);
-        }, 3000);
+        }, CONFIG.NOTIFICATION_TIMEOUT_MS);
     }
 
     // ===== SOUND EFFECTS =====
     playSound(type) {
-        // Web Audio API for simple sound effects
-        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // Reuse a single AudioContext to avoid browser limits
+        if (!this.audioContext) {
+            this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        }
+        const audioContext = this.audioContext;
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
         
@@ -982,25 +1034,35 @@ Generado por Generador de Rifas Profesional
             stats: this.stats,
             previousWinnersToExclude: this.previousWinnersToExclude
         };
-        localStorage.setItem('raffleApp', JSON.stringify(data));
+        try {
+            localStorage.setItem('raffleApp', JSON.stringify(data));
+        } catch (e) {
+            console.warn('Error guardando en localStorage:', e);
+        }
     }
 
     loadFromLocalStorage() {
-        const data = localStorage.getItem('raffleApp');
-        if (data) {
-            const parsed = JSON.parse(data);
-            this.theme = parsed.theme || 'light';
-            this.colorTheme = parsed.colorTheme || 'purple';
-            this.animationSpeed = parsed.animationSpeed || 'normal';
-            this.history = parsed.history || [];
-            this.stats = parsed.stats || { totalParticipants: 0, totalWinners: 0, totalRaffles: 0 };
-            this.previousWinnersToExclude = parsed.previousWinnersToExclude || [];
+        try {
+            const data = localStorage.getItem('raffleApp');
+            if (data) {
+                const parsed = JSON.parse(data);
+                this.theme = parsed.theme || 'light';
+                this.colorTheme = parsed.colorTheme || 'purple';
+                this.animationSpeed = parsed.animationSpeed || 'normal';
+                this.history = Array.isArray(parsed.history) ? parsed.history : [];
+                this.stats = parsed.stats || { totalParticipants: 0, totalWinners: 0, totalRaffles: 0 };
+                this.previousWinnersToExclude = Array.isArray(parsed.previousWinnersToExclude) ? parsed.previousWinnersToExclude : [];
+            }
+        } catch (e) {
+            console.warn('Datos de localStorage corruptos, reseteando.', e);
+            localStorage.removeItem('raffleApp');
         }
     }
     
     // Clear previous winners for exclusion
-    clearPreviousWinners() {
-        if (confirm('¿Estás seguro de que deseas limpiar la lista de ganadores anteriores? Esto permitirá que vuelvan a participar en sorteos futuros.')) {
+    async clearPreviousWinners() {
+        const confirmed = await this.showConfirm('¿Estás seguro de que deseas limpiar la lista de ganadores anteriores? Esto permitirá que vuelvan a participar en sorteos futuros.');
+        if (confirmed) {
             this.previousWinnersToExclude = [];
             this.saveToLocalStorage();
             this.showNotification('Lista de ganadores anteriores limpiada', 'success');
@@ -1015,34 +1077,79 @@ Generado por Generador de Rifas Profesional
         }
     }
 
-    // ===== UTILITIES =====
-    sleep(ms) {
+    // ===== ACCESSIBLE CONFIRM DIALOG =====
+    showConfirm(message, okLabel = 'Aceptar', cancelLabel = 'Cancelar') {
+        return new Promise(resolve => {
+            const modal = document.getElementById('confirmModal');
+            const msgEl = document.getElementById('confirmMessage');
+            const okBtn = document.getElementById('confirmOk');
+            const cancelBtn = document.getElementById('confirmCancel');
+
+            msgEl.textContent = message;
+            okBtn.textContent = okLabel;
+            cancelBtn.textContent = cancelLabel;
+
+            modal.classList.add('show');
+            okBtn.focus();
+
+            const cleanup = (result) => {
+                modal.classList.remove('show');
+                okBtn.removeEventListener('click', onOk);
+                cancelBtn.removeEventListener('click', onCancel);
+                document.removeEventListener('keydown', onKey);
+                resolve(result);
+            };
+
+            const onOk = () => cleanup(true);
+            const onCancel = () => cleanup(false);
+            const onKey = (e) => {
+                if (e.key === 'Escape') cleanup(false);
+            };
+
+            okBtn.addEventListener('click', onOk);
+            cancelBtn.addEventListener('click', onCancel);
+            document.addEventListener('keydown', onKey);
+        });
+    }
         return new Promise(resolve => setTimeout(resolve, ms));
     }
-}
 
-// Add confetti animation to CSS dynamically
-const style = document.createElement('style');
-style.textContent = `
-    @keyframes confettiFall {
-        to {
-            transform: translateY(500px) rotate(720deg);
-            opacity: 0;
+    /** Cryptographically secure random integer in [0, max) */
+    getSecureRandom(max) {
+        const array = new Uint32Array(1);
+        crypto.getRandomValues(array);
+        // Reject values that would introduce modulo bias
+        const limit = (2 ** 32) - ((2 ** 32) % max);
+        let value = array[0];
+        while (value >= limit) {
+            crypto.getRandomValues(array);
+            value = array[0];
+        }
+        return value % max;
+    }
+
+    /** Returns participant count without materializing a large array */
+    getParticipantCount() {
+        if (this.mode === 'names') {
+            const input = document.getElementById('nameInput').value.trim();
+            if (!input) return 0;
+            return input.split(/[\n,]+/).filter(name => name.trim().length > 0).length;
+        } else {
+            const start = parseInt(document.getElementById('startNumber').value);
+            const end = parseInt(document.getElementById('endNumber').value);
+            if (isNaN(start) || isNaN(end) || start > end) return 0;
+            const count = end - start + 1;
+            return count > CONFIG.MAX_NUMBER_RANGE ? 0 : count;
         }
     }
-    
-    @keyframes fadeOut {
-        from {
-            opacity: 1;
-            transform: translateX(0);
-        }
-        to {
-            opacity: 0;
-            transform: translateX(20px);
-        }
+
+    debounce(fn, delay) {
+        let timer;
+        return (...args) => {
+            clearTimeout(timer);
+            timer = setTimeout(() => fn.apply(this, args), delay);
+        };
     }
-`;
-document.head.appendChild(style);
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {

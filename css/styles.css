@@ -1022,6 +1022,67 @@ fieldset.mode-selector {
     }
 }
 
+/* ===== NOTIFICATION TOASTS ===== */
+.notification {
+    position: fixed;
+    top: 100px;
+    right: 20px;
+    padding: 15px 25px;
+    color: white;
+    border-radius: 8px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    z-index: 3000;
+    animation: slideInRight 0.3s ease;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 360px;
+}
+
+.notification--success { background: var(--success-color); }
+.notification--error   { background: var(--danger-color); }
+.notification--info    { background: #3b82f6; }
+.notification--warning { background: var(--warning-color); }
+
+/* ===== CONFIRM DIALOG ===== */
+.modal-content--confirm {
+    max-width: 420px;
+}
+
+.confirm-message {
+    font-size: 1rem;
+    color: var(--text-primary);
+    margin-bottom: 25px;
+    line-height: 1.6;
+    white-space: pre-line;
+}
+
+.confirm-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+}
+
+@keyframes confettiFall {
+    to {
+        transform: translateY(500px) rotate(720deg);
+        opacity: 0;
+    }
+}
+
+@keyframes fadeOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(20px);
+    }
+}
+
 /* Scrollbar Styling */
 ::-webkit-scrollbar {
     width: 10px;
