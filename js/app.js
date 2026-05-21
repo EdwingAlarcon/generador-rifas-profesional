@@ -1111,6 +1111,9 @@ Generado por Generador de Rifas Profesional
             document.addEventListener('keydown', onKey);
         });
     }
+
+    // ===== UTILITIES =====
+    sleep(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
