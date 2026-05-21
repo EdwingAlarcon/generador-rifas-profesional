@@ -1,5 +1,5 @@
 // Service Worker para Generador de Rifas Profesional
-const CACHE_NAME = 'rifas-pro-v1.1.0';
+const CACHE_NAME = 'rifas-pro-v1.2.0';
 const OFFLINE_URL = '/index.html';
 
 // Archivos a cachear para funcionamiento offline

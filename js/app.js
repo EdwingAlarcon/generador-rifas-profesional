@@ -1153,6 +1153,7 @@ Generado por Generador de Rifas Profesional
             timer = setTimeout(() => fn.apply(this, args), delay);
         };
     }
+}
 
 // Initialize app when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
