@@ -24,7 +24,7 @@ self.addEventListener('install', (event) => {
       })
       .then(() => {
         console.log('[SW] Todos los archivos han sido cacheados');
-        // skipWaiting is triggered via postMessage({ type: 'SKIP_WAITING' }) from the app
+        return self.skipWaiting(); // Activate immediately so new cache is used right away
       })
       .catch((error) => {
         console.error('[SW] Error al cachear archivos:', error);
